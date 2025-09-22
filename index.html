@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SKU Checker</title>
+  <title>SKU Checker with History</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
@@ -13,6 +13,7 @@
     th { background: #f0f0f0; }
     .file-input { margin-bottom: 10px; }
     .section { margin-top: 30px; }
+    .history { margin-top: 40px; }
   </style>
 </head>
 <body>
@@ -76,6 +77,18 @@
     </table>
   </div>
 
+  <!-- HISTORY -->
+  <div class="history">
+    <h3>Search History</h3>
+    <button onclick="clearHistory()">Clear History</button>
+    <table>
+      <thead>
+        <tr><th>Time</th><th>SKU</th><th>Sale Info</th><th>Price Info</th><th>Promo Info</th></tr>
+      </thead>
+      <tbody id="historyTable"></tbody>
+    </table>
+  </div>
+
   <script>
     let saleData = "";
     let priceData = "";
@@ -94,6 +107,38 @@
       return content;
     }
 
+    function saveToHistory(sku, sale, price, promo) {
+      let history = JSON.parse(localStorage.getItem("skuHistory")) || [];
+      history.push({
+        time: new Date().toLocaleString(),
+        sku, sale, price, promo
+      });
+      localStorage.setItem("skuHistory", JSON.stringify(history));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      let history = JSON.parse(localStorage.getItem("skuHistory")) || [];
+      const table = document.getElementById("historyTable");
+      if (history.length === 0) {
+        table.innerHTML = "<tr><td colspan='5'>No history yet...</td></tr>";
+        return;
+      }
+      table.innerHTML = history.map(h =>
+        `<tr>
+          <td>${h.time}</td>
+          <td>${h.sku}</td>
+          <td>${h.sale}</td>
+          <td>${h.price}</td>
+          <td>${h.promo}</td>
+        </tr>`).join("");
+    }
+
+    function clearHistory() {
+      localStorage.removeItem("skuHistory");
+      renderHistory();
+    }
+
     async function checkAll() {
       const sku = document.getElementById("skuInput").value.trim();
       if (!sku) {
@@ -106,6 +151,10 @@
       if (!priceData) priceData = await loadZip(document.getElementById("priceZip"));
       if (!promoData) promoData = await loadZip(document.getElementById("promoZip"));
 
+      let saleInfo = "Not found";
+      let priceInfo = "Not found";
+      let promoInfo = "Not found";
+
       // --- SALE ITEM ---
       let saleFound = null;
       saleData.split(/\r?\n/).forEach(line => {
@@ -115,6 +164,7 @@
         }
       });
       if (saleFound) {
+        saleInfo = `${saleFound.desc}, ${saleFound.price}`;
         document.getElementById("saleResult").innerHTML =
           `<tr><td>${saleFound.sku}</td><td>${saleFound.desc}</td><td>${saleFound.start}</td><td>${saleFound.end}</td><td>${saleFound.price}</td></tr>`;
       } else {
@@ -130,6 +180,7 @@
         }
       });
       if (priceFound) {
+        priceInfo = `${priceFound.priceToday} (since ${priceFound.date})`;
         document.getElementById("priceResult").innerHTML =
           `<tr><td>${priceFound.sku}</td><td>${priceFound.priceToday}</td><td>${priceFound.date}</td></tr>`;
       } else {
@@ -145,13 +196,19 @@
         }
       });
       if (promoFound) {
+        promoInfo = `${promoFound.promoType}, ${promoFound.value}`;
         document.getElementById("promoResult").innerHTML =
           `<tr><td>${promoFound.sku}</td><td>${promoFound.desc}</td><td>${promoFound.start}</td><td>${promoFound.end}</td><td>${promoFound.promoType}</td><td>${promoFound.value}</td></tr>`;
       } else {
         document.getElementById("promoResult").innerHTML = `<tr><td colspan="6">SKU ${sku} not found</td></tr>`;
       }
+
+      // Save to history
+      saveToHistory(sku, saleInfo, priceInfo, promoInfo);
     }
+
+    // Load history on page load
+    renderHistory();
   </script>
 </body>
 </html>
-
