@@ -1,1 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SKU Checker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-bottom: 5px; }
+    input, button { padding: 8px; margin: 5px 0; }
+    table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    th { background: #f0f0f0; }
+    .file-input { margin-bottom: 10px; }
+    .section { margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h2>Unified SKU Checker</h2>
+
+  <!-- Upload ZIP files -->
+  <div class="file-input">
+    <label>Upload SALEITEM.ZIP: </label>
+    <input type="file" id="saleZip" accept=".zip">
+  </div>
+  <div class="file-input">
+    <label>Upload PRICECHA.ZIP: </label>
+    <input type="file" id="priceZip" accept=".zip">
+  </div>
+  <div class="file-input">
+    <label>Upload PROMOHDR.ZIP: </label>
+    <input type="file" id="promoZip" accept=".zip">
+  </div>
+
+  <!-- SINGLE SEARCH BOX -->
+  <div class="section">
+    <h3>Search SKU Across All Files</h3>
+    <input type="text" id="skuInput" placeholder="Enter SKU">
+    <button onclick="checkAll()">Search</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="section">
+    <h3>Sale Item</h3>
+    <table>
+      <thead>
+        <tr><th>SKU</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Price</th></tr>
+      </thead>
+      <tbody id="saleResult">
+        <tr><td colspan="5">No search yet...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h3>Price Change</h3>
+    <table>
+      <thead>
+        <tr><th>SKU</th><th>Price Today</th><th>Effective Date</th></tr>
+      </thead>
+      <tbody id="priceResult">
+        <tr><td colspan="3">No search yet...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h3>Promo</h3>
+    <table>
+      <thead>
+        <tr><th>SKU</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Promo Type</th><th>Value</th></tr>
+      </thead>
+      <tbody id="promoResult">
+        <tr><td colspan="6">No search yet...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    let saleData = "";
+    let priceData = "";
+    let promoData = "";
+
+    async function loadZip(fileInput) {
+      if (!fileInput.files[0]) return "";
+      const zip = await JSZip.loadAsync(fileInput.files[0]);
+      let content = "";
+      for (let filename in zip.files) {
+        const file = zip.files[filename];
+        if (!file.dir) {
+          content += await file.async("string");
+        }
+      }
+      return content;
+    }
+
+    async function checkAll() {
+      const sku = document.getElementById("skuInput").value.trim();
+      if (!sku) {
+        alert("Please enter SKU");
+        return;
+      }
+
+      // Load all files if not yet loaded
+      if (!saleData) saleData = await loadZip(document.getElementById("saleZip"));
+      if (!priceData) priceData = await loadZip(document.getElementById("priceZip"));
+      if (!promoData) promoData = await loadZip(document.getElementById("promoZip"));
+
+      // --- SALE ITEM ---
+      let saleFound = null;
+      saleData.split(/\r?\n/).forEach(line => {
+        const parts = line.split(",");
+        if (parts[0] && parts[0].includes(sku)) {
+          saleFound = { sku: parts[0], desc: parts[1], start: parts[2], end: parts[3], price: parts[5] };
+        }
+      });
+      if (saleFound) {
+        document.getElementById("saleResult").innerHTML =
+          `<tr><td>${saleFound.sku}</td><td>${saleFound.desc}</td><td>${saleFound.start}</td><td>${saleFound.end}</td><td>${saleFound.price}</td></tr>`;
+      } else {
+        document.getElementById("saleResult").innerHTML = `<tr><td colspan="5">SKU ${sku} not found</td></tr>`;
+      }
+
+      // --- PRICE CHANGE ---
+      let priceFound = null;
+      priceData.split(/\r?\n/).forEach(line => {
+        const parts = line.split(",");
+        if (parts[0] && parts[0].includes(sku)) {
+          priceFound = { sku: parts[0], priceToday: parts[1], date: parts[2] };
+        }
+      });
+      if (priceFound) {
+        document.getElementById("priceResult").innerHTML =
+          `<tr><td>${priceFound.sku}</td><td>${priceFound.priceToday}</td><td>${priceFound.date}</td></tr>`;
+      } else {
+        document.getElementById("priceResult").innerHTML = `<tr><td colspan="3">SKU ${sku} not found</td></tr>`;
+      }
+
+      // --- PROMO ---
+      let promoFound = null;
+      promoData.split(/\r?\n/).forEach(line => {
+        const parts = line.split(",");
+        if (parts[0] && parts[0].includes(sku)) {
+          promoFound = { sku: parts[0], desc: parts[3], start: parts[1], end: parts[2], promoType: parts[5], value: parts[6] };
+        }
+      });
+      if (promoFound) {
+        document.getElementById("promoResult").innerHTML =
+          `<tr><td>${promoFound.sku}</td><td>${promoFound.desc}</td><td>${promoFound.start}</td><td>${promoFound.end}</td><td>${promoFound.promoType}</td><td>${promoFound.value}</td></tr>`;
+      } else {
+        document.getElementById("promoResult").innerHTML = `<tr><td colspan="6">SKU ${sku} not found</td></tr>`;
+      }
+    }
+  </script>
+</body>
+</html>
 
